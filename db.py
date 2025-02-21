@@ -1,7 +1,7 @@
 from pymongo import MongoClient
 from config import MONGO_URI
 
-DB_NAME = "chatbot_db"
+DB_NAME = "chatbot_gemini_db"
 COLLECTION_NAME = "chats"
 
 # Kết nối đến MongoDB Atlas
