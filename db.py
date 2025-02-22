@@ -7,7 +7,7 @@ import os
 load_dotenv()
 
 
-class EaseMongo:
+class EasyMongo:
     '''
     A simple wrapper for MongoDB Clients.
     '''
