@@ -8,9 +8,10 @@ class LLMStrings:
     """
     A brief description of the MyClass class.
     """
-
+    
     # Q&A strings
-    PROMPT_TEMPLATE = "You are a question-answer chatbot named: AI Assistant. Answer this:"
+    PROMPT_TEMPLATE = f"""You are a question-answer chatbot named: AI Assistant. Answer this:
+                        """  #not need because of the full_prompt has been defined in output_text function in utils.py
     GREETINGS = "Greetings, esteemed visitor! Welcome to the realm of knowledge and innovation. " \
                 "I am your AI assistant, ready to guide you through this digital landscape. " \
                 "How can I assist you on this insightful journey today?"

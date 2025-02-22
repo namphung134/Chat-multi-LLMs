@@ -1,5 +1,3 @@
-from langchain.callbacks.manager import CallbackManager
-from langchain.callbacks.streaming_stdout import StreamingStdOutCallbackHandler
 import google.generativeai as genai
 import streamlit as st
 import os
@@ -11,6 +9,7 @@ from utils import output_text, simulate_response, create_message
 
 load_dotenv()
 genai.configure(api_key=os.getenv("GOOGLE_API_KEY"))  # Đọc API key từ môi trường
+
 
 
 if __name__ == '__main__':
@@ -50,15 +49,15 @@ if __name__ == '__main__':
 
         with st.spinner(LLMStrings.WAIT_MESSAGE):
             with st.chat_message(LLMStrings.AI_ROLE):
-                # Get response and display
-                response = output_text(llm, prompt)
-
-                # Add user message to chat history
+                # Gửi toàn bộ lịch sử hội thoại cho Gemini từ MongoDB
+                response = output_text(llm, prompt, mongo_server)
+                
+                # Lưu tin nhắn AI vào session state
                 ai_content = create_message(LLMStrings.AI_ROLE, response)
                 st.session_state.messages.append(ai_content)
 
-                # Simulate stream of response with milliseconds delay
+                # Hiển thị phản hồi
                 simulate_response(response)
 
-                # Insert messages to MongoDB
+                # Lưu vào MongoDB
                 mongo_server.insert_many([user_content, ai_content])

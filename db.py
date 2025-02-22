@@ -39,6 +39,24 @@ class EasyMongo:
         collection = dbname[self.COLLECTION]
         return collection
     
+    def get_recent_messages(self, limit=5):
+        '''
+        Retrieve the most recent chat history.
+        :param limit: Number of recent messages to retrieve.
+        :type limit: int
+        :return: List of recent messages.
+        :rtype: List[Dict]
+        '''
+        collection = self.get_collection()
+    
+        # Lấy n tin nhắn gần nhất, sắp xếp theo thời gian giảm dần
+        messages = collection.find().sort("_id", -1).limit(limit)
+    
+        # Chuyển thành list và đảo ngược lại để giữ thứ tự hội thoại
+        messages = list(messages)[::-1]
+            
+        return messages
+    
     def insert_many(self, data: Dict):
         '''
         Insert multiple data chat to MongoDB.
