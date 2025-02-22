@@ -1,4 +1,5 @@
-from pymongo import MongoClient
+from datetime import datetime
+from pymongo import MongoClient, ASCENDING
 from dotenv import load_dotenv
 from typing import List, Dict
 import os
@@ -73,6 +74,32 @@ class EasyMongo:
             print(f"Inserted IDs: {result.inserted_ids}")
         except Exception as e:
             print(f"An error occured: {e}")
+            
+    def init_ttl_index(self):
+        """
+        Tạo TTL Index cho collection để tự động xóa dữ liệu sau 24h.
+        """
+        collection = self.get_collection()
+        collection.create_index([("timestamp", ASCENDING)], expireAfterSeconds=30)
+
+    def get_token_usage(self, model_name):
+        """
+        Lấy số token đã sử dụng của mô hình từ MongoDB.
+        """
+        collection = self.get_collection()
+        usage = collection.find_one({"type": "token_usage", "model": model_name})
+        return usage["used_tokens"] if usage else 0
+
+    def update_token_usage(self, model_name, used_tokens):
+        """
+        Cập nhật số token đã sử dụng vào MONGO_COLLECTION.
+        """
+        collection = self.get_collection()
+        collection.update_one(
+            {"type": "token_usage", "model": model_name},
+            {"$set": {"used_tokens": used_tokens, "timestamp": datetime.utcnow()}},
+            upsert=True
+        )
             
     def test_data(self):
         '''

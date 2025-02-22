@@ -2,15 +2,43 @@ import streamlit as st
 import time
 from llm_strings import LLMStrings
 import google.generativeai as genai
+from openai import OpenAI
 from typing import Dict
 import os
 from db import EasyMongo
 
 
-GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")  # Đặt API key trên Streamlit Cloud
+# Load API Keys
+GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 
+# Cấu hình các model
+genai.configure(api_key=GOOGLE_API_KEY)
 gemini_model = genai.GenerativeModel("gemini-2.0-flash")
+gpt_client = OpenAI(api_key=OPENAI_API_KEY)
 
+# Mức token tối đa mỗi ngày
+MAX_TOKENS_PER_MODEL = 1000
+
+def get_model_and_check_tokens(mongo: EasyMongo):
+    """
+    Kiểm tra model nào còn token để sử dụng.
+    """
+    gemini_usage = mongo.get_token_usage("gemini-2.0-flash")
+    gpt_usage = mongo.get_token_usage("gpt-3.5-turbo")
+
+    if gemini_usage < MAX_TOKENS_PER_MODEL:
+        return "gemini-2.0-flash", gemini_model
+    elif gpt_usage < MAX_TOKENS_PER_MODEL:
+        return "gpt-3.5-turbo", gpt_client
+    else:
+        return None, None
+
+# def count_tokens(text):
+#     """
+#     Hàm đơn giản để đếm số token.
+#     """
+#     return len(text.split())
 
 def create_message(role: str, content: str) -> Dict:
     """
@@ -26,7 +54,7 @@ def create_message(role: str, content: str) -> Dict:
     return {LLMStrings.ROLE_ID: role, LLMStrings.CONTENT: content}
 
 
-def output_text(llm_model: genai.GenerativeModel, text: str, mongo: EasyMongo) -> str:
+def output_text(text: str, mongo: EasyMongo) -> str:
     """
     Generates output from the LLM model.
 
@@ -42,10 +70,11 @@ def output_text(llm_model: genai.GenerativeModel, text: str, mongo: EasyMongo) -
     """
     # Lấy 5 tin nhắn gần nhất từ MongoDB
     recent_messages = mongo.get_recent_messages(limit=5)
-
+    print(recent_messages)
+    
     # Xây dựng lịch sử hội thoại
     conversation_history = "\n".join(
-        [f"{msg[LLMStrings.ROLE_ID]}: {msg[LLMStrings.CONTENT]}" for msg in recent_messages]
+        [f"{msg.get('role', 'unknown')}: {msg.get('content', '')}" for msg in recent_messages]
     )
 
     # Ghép prompt với lịch sử hội thoại
@@ -64,9 +93,29 @@ def output_text(llm_model: genai.GenerativeModel, text: str, mongo: EasyMongo) -
     """
     # print(f"Full prompt: {full_prompt}")
     
-    response = llm_model.generate_content(full_prompt)
+    model_name, model = get_model_and_check_tokens(mongo)
 
-    return response.text
+    if model is None:
+        return "Bạn đã dùng hết token hôm nay. Vui lòng quay lại sau 24h!"
+
+    # Tạo phản hồi từ mô hình tương ứng
+    if model_name == "gemini-2.0-flash":
+        response = model.generate_content(full_prompt)
+        print(response)
+        token_used = response._result.usage_metadata.total_token_count
+        output_t = response.text
+        
+    else:  # GPT-3.5-turbo
+        response = model.chat.completions.create(model="gpt-3.5-turbo", messages=[{"role": "user", "content": full_prompt}])
+        token_used = response.usage.total_tokens
+        output_t = response.choices[0].message.content
+
+    # Cập nhật token usage vào MongoDB
+    new_usage = mongo.get_token_usage(model_name) + token_used
+    mongo.update_token_usage(model_name, new_usage)
+
+    return output_t  # Trả về kết quả sau khi đã cập nhật token
+
 
 
 def simulate_response(text: str):
