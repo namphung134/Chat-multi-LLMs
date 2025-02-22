@@ -18,7 +18,8 @@ gemini_model = genai.GenerativeModel("gemini-2.0-flash")
 gpt_client = OpenAI(api_key=OPENAI_API_KEY)
 
 # Mức token tối đa mỗi ngày
-MAX_TOKENS_PER_MODEL = 1000
+MAX_TOKENS_PER_MODEL = 2000
+
 
 def get_model_and_check_tokens(mongo: EasyMongo):
     """
@@ -34,11 +35,6 @@ def get_model_and_check_tokens(mongo: EasyMongo):
     else:
         return None, None
 
-# def count_tokens(text):
-#     """
-#     Hàm đơn giản để đếm số token.
-#     """
-#     return len(text.split())
 
 def create_message(role: str, content: str) -> Dict:
     """

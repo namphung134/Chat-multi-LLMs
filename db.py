@@ -21,6 +21,7 @@ class EasyMongo:
         self.DB = "MONGO_DB"
         self.COLLECTION = "MONGO_COLLECTION"
         
+        
     def get_database(self):
         '''
         Create a connection to the MongoDB Atlas url and return NoSQL Database.
@@ -31,6 +32,7 @@ class EasyMongo:
         db = client[self.DB]
         return db
     
+    
     def get_collection(self):
         '''
         Get the collection from the database.
@@ -39,6 +41,7 @@ class EasyMongo:
         
         collection = dbname[self.COLLECTION]
         return collection
+    
     
     def get_recent_messages(self, limit=5):
         '''
@@ -58,6 +61,7 @@ class EasyMongo:
             
         return messages
     
+    
     def insert_many(self, data: Dict):
         '''
         Insert multiple data chat to MongoDB.
@@ -74,13 +78,15 @@ class EasyMongo:
             print(f"Inserted IDs: {result.inserted_ids}")
         except Exception as e:
             print(f"An error occured: {e}")
+        
             
     def init_ttl_index(self):
         """
         Tạo TTL Index cho collection để tự động xóa dữ liệu sau 24h.
         """
         collection = self.get_collection()
-        collection.create_index([("timestamp", ASCENDING)], expireAfterSeconds=30)
+        collection.create_index([("timestamp", ASCENDING)], expireAfterSeconds=600)
+
 
     def get_token_usage(self, model_name):
         """
@@ -89,6 +95,7 @@ class EasyMongo:
         collection = self.get_collection()
         usage = collection.find_one({"type": "token_usage", "model": model_name})
         return usage["used_tokens"] if usage else 0
+
 
     def update_token_usage(self, model_name, used_tokens):
         """
@@ -100,6 +107,7 @@ class EasyMongo:
             {"$set": {"used_tokens": used_tokens, "timestamp": datetime.utcnow()}},
             upsert=True
         )
+       
             
     def test_data(self):
         '''

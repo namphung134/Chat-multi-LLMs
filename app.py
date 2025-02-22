@@ -6,7 +6,7 @@ from datetime import datetime
 
 from db import EasyMongo
 from llm_strings import LLMStrings
-from utils import output_text, simulate_response
+from utils import output_text, simulate_response, get_model_and_check_tokens
 
 # Load API key từ môi trường
 load_dotenv()
@@ -18,6 +18,10 @@ mongo_server.init_ttl_index()  # Khởi tạo TTL Index
 
 # Giao diện ứng dụng
 st.title(LLMStrings.APP_TITLE)
+
+# Lấy tên model để hiển thị trong chat
+model_name, model = get_model_and_check_tokens(mongo_server)
+st.write(f"### Model: {model_name}")
 
 # Hiển thị lời chào từ AI
 with st.chat_message(LLMStrings.AI_ROLE):
