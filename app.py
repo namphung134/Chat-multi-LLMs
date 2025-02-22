@@ -56,6 +56,7 @@ if __name__ == '__main__':
                 ai_content = create_message(LLMStrings.AI_ROLE, response)
                 st.session_state.messages.append(ai_content)
 
+
                 # Hiển thị phản hồi
                 simulate_response(response)
 
