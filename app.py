@@ -1,54 +1,63 @@
+from langchain.callbacks.manager import CallbackManager
+from langchain.callbacks.streaming_stdout import StreamingStdOutCallbackHandler
+import google.generativeai as genai
 import streamlit as st
-from db import save_chat, load_chat, get_all_sessions
-from chatbot import get_gemini_response
-from utils import display_chat
+import os
+from dotenv import load_dotenv
+from db import EasyMongo
+from llm_strings import LLMStrings
+from utils import output_text, simulate_response, create_message
 
-# Setup giao diện
-st.set_page_config(page_title="Chatbot Gemini", layout="wide")
-st.sidebar.title("Chatbot Gemini")
+load_dotenv()
+genai.configure(api_key=os.getenv("GOOGLE_API_KEY"))  # Đọc API key từ môi trường
 
-# Quản lý session ID
-if "session_id" not in st.session_state:
-    st.session_state.session_id = "default"
 
-# Load danh sách lịch sử chat
-st.sidebar.subheader("History")
-session_list = get_all_sessions()
-selected_session = st.sidebar.selectbox("Chọn cuộc trò chuyện", session_list, index=0) if session_list else None
+if __name__ == '__main__':
+    # Get LLM model
+    llm = genai.GenerativeModel("gemini-2.0-flash")
 
-if st.sidebar.button("New Chat"):
-    st.session_state.session_id = f"chat_{len(session_list) + 1}"
-    st.session_state.messages = []
+    # App title
+    st.title(LLMStrings.APP_TITLE)
 
-# Load lịch sử chat từ MongoDB
-if selected_session:
-    st.session_state.session_id = selected_session
-    st.session_state.messages = load_chat(selected_session)
+    # Initial prompt
+    with st.chat_message(LLMStrings.AI_ROLE):
+        st.write(LLMStrings.GREETINGS)
 
-# Hiển thị phần chat
-st.title("🤖 Chatbot Gemini")
-st.subheader("Trò chuyện cùng AI")
+    # Initialize chat history
+    if LLMStrings.SESSION_STATES not in st.session_state:
+        st.session_state.messages = []
 
-# Khởi tạo lịch sử chat
-if "messages" not in st.session_state:
-    st.session_state.messages = []
+    # Connect MongoDB
+    mongo_server = EasyMongo()
+    collection_name = mongo_server.get_collection()
 
-display_chat(st.session_state.messages)
+    # Display chat messages from history on app rerun
+    messages = collection_name.find()
+    for message in messages:
+        with st.chat_message(message[LLMStrings.ROLE_ID]):
+            st.markdown(message[LLMStrings.CONTENT])
 
-# Nhận input từ người dùng
-user_input = st.text_input("Nhập tin nhắn...", key="user_input")
+    # React to user input
+    if prompt := st.chat_input(LLMStrings.INPUT_PLACEHOLDER):
 
-if st.button("Gửi"):
-    if user_input:
-        # Thêm tin nhắn người dùng vào session
-        st.session_state.messages.append({"role": "user", "text": user_input})
+        # Display user message in chat message container
+        with st.chat_message(LLMStrings.USER_ROLE):
+            st.markdown(prompt)
+            # Add user message to chat history
+            user_content = create_message(LLMStrings.USER_ROLE, prompt)
+            st.session_state.messages.append(user_content)
 
-        # Gọi Gemini API
-        bot_response = get_gemini_response(user_input)
-        st.session_state.messages.append({"role": "bot", "text": bot_response})
+        with st.spinner(LLMStrings.WAIT_MESSAGE):
+            with st.chat_message(LLMStrings.AI_ROLE):
+                # Get response and display
+                response = output_text(llm, prompt)
 
-        # Lưu vào MongoDB
-        save_chat(st.session_state.session_id, st.session_state.messages)
+                # Add user message to chat history
+                ai_content = create_message(LLMStrings.AI_ROLE, response)
+                st.session_state.messages.append(ai_content)
 
-        # Cập nhật giao diện chat
-        st.experimental_rerun()
+                # Simulate stream of response with milliseconds delay
+                simulate_response(response)
+
+                # Insert messages to MongoDB
+                mongo_server.insert_many([user_content, ai_content])

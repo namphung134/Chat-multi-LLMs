@@ -1,3 +1,7 @@
 streamlit
 pymongo
 google-generativeai
+langchain
+pandas
+openai
+python-dotenv

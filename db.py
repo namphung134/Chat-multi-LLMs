@@ -1,23 +1,80 @@
 from pymongo import MongoClient
-from config import MONGO_URI
+from dotenv import load_dotenv
+from typing import List, Dict
+import os
 
-DB_NAME = "chatbot_gemini_db"
-COLLECTION_NAME = "chats"
+# take environment variables from .env
+load_dotenv()
 
-# Kết nối đến MongoDB Atlas
-client = MongoClient(MONGO_URI)
-db = client[DB_NAME]
-collection = db[COLLECTION_NAME]
 
-def save_chat(session_id, messages):
-    """Lưu lịch sử chat vào MongoDB"""
-    collection.update_one({"session_id": session_id}, {"$set": {"messages": messages}}, upsert=True)
-
-def load_chat(session_id):
-    """Tải lịch sử chat từ MongoDB"""
-    chat = collection.find_one({"session_id": session_id})
-    return chat["messages"] if chat else []
+class EaseMongo:
+    '''
+    A simple wrapper for MongoDB Clients.
+    '''
     
-def get_all_sessions():
-    """Lấy danh sách các phiên chat"""
-    return [chat["session_id"] for chat in collection.find({}, {"session_id": 1})]
+    def __init__(self):
+        '''
+        Initialize the MongoDB client.
+        '''
+        self.URI = os.getenv("MONGO_URI")
+        self.DB = os.getenv["GEMINI-CHATBOT-DB"]
+        self.COLLECTION = os.getenv["GEMINI-CHATBOT-COLLECTION"]
+        
+    def get_database(self):
+        '''
+        Create a connection to the MongoDB Atlas url and return NoSQL Database.
+        '''
+        client = MongoClient(self.URI)
+        
+        # Connect to the database
+        db = client[self.DB]
+        return db
+    
+    def get_collection(self):
+        '''
+        Get the collection from the database.
+        '''
+        dbname = self.get_database()
+        
+        collection = dbname[self.COLLECTION]
+        return collection
+    
+    def insert_many(self, data: Dict):
+        '''
+        Insert multiple data chat to MongoDB.
+
+        :param data: List of Dictionaries.
+        :type data: List[Dict]
+        '''
+        collection = self.get_collection()
+        
+        try: 
+            # Insert the data
+            result = collection.insert_many(data)
+            print(f"Inserted {len(result.inserted_ids)} documents.")
+            print(f"Inserted IDs: {result.inserted_ids}")
+        except Exception as e:
+            print(f"An error occured: {e}")
+            
+    def test_data(self):
+        '''
+        Test data for MongoDB.
+        '''
+        user_content = {"role": "user", "content": "What is machine learning in 200 characters?"}
+        ai_content = {"role": "assistant", "content": "Machine learning is a subset of artificial intelligence that "
+                                                      "enables computers to learn and improve their performance on a "
+                                                      "task without explicitly programmed instructions, by using "
+                                                      "algorithms and statistical models to analyze and learn "
+                                                      "from data."}
+        user_content2 = {"role": "user", "content": "What is deep learning in 200 characters?"}
+        ai_content2 = {"role": "assistant", "content": "Deep learning is a subset of machine learning that utilizes "
+                                                       "neural networks with multiple layers to learn and represent "
+                                                       "complex patterns in data. It enables AI models to recognize "
+                                                       "and make decisions based on intricate relationships within "
+                                                       "the data, leading to improved accuracy and efficiency in "
+                                                       "various applications such as image recognition, natural "
+                                                       "language processing, and speech recognition."}
+        
+        self.insert_many([user_content, ai_content, user_content2, ai_content2])
+
+

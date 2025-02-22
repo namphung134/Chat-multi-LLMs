@@ -1,0 +1,39 @@
+"""
+Module: llm_strings.py
+Description: A class that contains various strings for use for the LLM Chatbot.
+"""
+
+
+class LLMStrings:
+    """
+    A brief description of the MyClass class.
+    """
+
+    # Q&A strings
+    PROMPT_TEMPLATE = "You are a question-answer chatbot named: AI Assistant. Answer this:"
+    GREETINGS = "Greetings, esteemed visitor! Welcome to the realm of knowledge and innovation. " \
+                "I am your AI assistant, ready to guide you through this digital landscape. " \
+                "How can I assist you on this insightful journey today?"
+    WAIT_MESSAGE = "Sit back, relax, and get ready for an AI-powered conversation while we process your request!"  
+    INPUT_PLACEHOLDER = "Ask anything, and let the AI assist you!"
+
+    # Streamlit strings
+    APP_TITLE = "AI Assistant Chatbot"
+    SESSION_STATES = "messages"
+
+    # MongoDB strings
+    USER_ROLE = "user"
+    AI_ROLE = "assistant"
+    
+    ROLE_ID = "role"
+    CONTENT = "content"
+
+    @staticmethod
+    def get_application_version():
+        """
+        Return the current version of the application.
+
+        :return: The version string.
+        :rtype: str
+        """
+        return "1.0.0"
