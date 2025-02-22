@@ -17,8 +17,8 @@ class EasyMongo:
         Initialize the MongoDB client.
         '''
         self.URI = os.getenv("MONGO_URI")
-        self.DB = os.getenv("MONGO_DB")
-        self.COLLECTION = os.getenv("MONGO_COLLECTION")
+        self.DB = "MONGO_DB"
+        self.COLLECTION = "MONGO_COLLECTION"
         
     def get_database(self):
         '''
