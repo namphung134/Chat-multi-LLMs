@@ -8,6 +8,7 @@ from db import EasyMongo
 from llm_strings import LLMStrings
 from utils import output_text, simulate_response, get_model_and_check_tokens
 
+
 # Load API key từ môi trường
 load_dotenv()
 genai.configure(api_key=os.getenv("GOOGLE_API_KEY"))
