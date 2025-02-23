@@ -85,7 +85,7 @@ class EasyMongo:
         Tạo TTL Index cho collection để tự động xóa dữ liệu sau 24h.
         """
         collection = self.get_collection()
-        collection.create_index([("timestamp", ASCENDING)], expireAfterSeconds=600)
+        collection.create_index([("timestamp", ASCENDING)], expireAfterSeconds=1000)
 
 
     def get_token_usage(self, model_name):
