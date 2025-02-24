@@ -1,16 +1,9 @@
-import google.generativeai as genai
 import streamlit as st
-import os
-from dotenv import load_dotenv
 from datetime import datetime
 
 from db import EasyMongo
-from llm_strings import LLMStrings
-from utils import output_text, simulate_response, get_model_and_check_tokens
-
-# Load API key từ môi trường
-load_dotenv()
-genai.configure(api_key=os.getenv("GOOGLE_API_KEY"))
+from llm_strings import LLMStrings, time_stamp
+from utils import get_model_and_check_tokens, output_text, simulate_response
 
 # Kết nối MongoDB
 mongo_server = EasyMongo()
@@ -23,55 +16,85 @@ st.title(LLMStrings.APP_TITLE)
 model_name, model = get_model_and_check_tokens(mongo_server)
 st.write(f"### Model: {model_name}")
 
-# Hiển thị lời chào từ AI
-with st.chat_message(LLMStrings.AI_ROLE):
-    st.write(LLMStrings.GREETINGS)
+# ------------------------ SIDE BAR ------------------------ #
+st.sidebar.title("Chat Sessions")
 
-# Khởi tạo session state nếu chưa có
-if LLMStrings.SESSION_STATES not in st.session_state:
+# Lấy danh sách session từ MongoDB
+chat_sessions = mongo_server.get_chat_sessions() or []
+
+# Nếu chưa có session_id trong session_state, khởi tạo mặc định
+if "session_id" not in st.session_state:
+    st.session_state.session_id = str(time_stamp())
+
+if "messages" not in st.session_state:
     st.session_state.messages = []
 
-# Lấy lịch sử hội thoại từ MongoDB (chỉ lấy một lần)
-if not st.session_state.messages:
-    messages = mongo_server.get_collection().find()
-    st.session_state.messages = [
-        {"role": message[LLMStrings.ROLE_ID], "content": message[LLMStrings.CONTENT]}
-        for message in messages
-    ]
+# ------------------------ Tạo session mới ------------------------ #
+if st.sidebar.button("🆕 New Chat"):
+    new_session_id = str(time_stamp())  # Tạo session_id mới
+    # new_session_id = datetime.utcnow().isoformat()
+    st.session_state.session_id = new_session_id
+    st.session_state.messages = []  # Reset tin nhắn tránh bị duplicate
 
-# Hiển thị tin nhắn trước đó
+    # Thêm session vào DB nếu chưa có
+    if new_session_id not in chat_sessions:
+        mongo_server.insert_messages(new_session_id, [
+            {"session_id": new_session_id, "role": LLMStrings.AI_ROLE, "content": "Hello, how can I help you?", "timestamp": datetime.utcnow()}
+        ])
+
+    # Cập nhật danh sách session
+    chat_sessions.append(new_session_id)
+
+    # Cập nhật UI ngay lập tức
+    st.rerun()
+
+# ------------------------ Chọn session từ lịch sử ------------------------ #
+if chat_sessions:
+    selected_session = st.sidebar.radio(
+        "History Chat",
+        chat_sessions,
+        index=chat_sessions.index(st.session_state.session_id) if st.session_state.session_id in chat_sessions else 0
+    )
+
+    # Chỉ load lại khi chọn session mới (tránh load trùng)
+    if selected_session != st.session_state.session_id:
+        st.session_state.session_id = selected_session
+
+        # **Xóa tin nhắn cũ trước khi tải tin nhắn mới**
+        st.session_state.messages = []
+
+        messages = mongo_server.get_recent_messages(selected_session)
+        if messages:
+            st.session_state.messages = messages
+
+        # Rerun UI để cập nhật giao diện
+        st.rerun()
+
+#---------------------------------------------------------#
+
+# Hiển thị lời chào từ AI nếu chưa có tin nhắn nào
+if not st.session_state.messages:
+    with st.chat_message(LLMStrings.AI_ROLE):
+        st.write(LLMStrings.GREETINGS)
+
+# Hiển thị lịch sử tin nhắn trong session
 for message in st.session_state.messages:
     with st.chat_message(message["role"]):
         st.markdown(message["content"])
 
-# Xử lý đầu vào từ user
+# Xử lý tin nhắn đầu vào từ người dùng
 if prompt := st.chat_input(LLMStrings.INPUT_PLACEHOLDER):
-    # Hiển thị tin nhắn của user
     with st.chat_message(LLMStrings.USER_ROLE):
         st.markdown(prompt)
         st.session_state.messages.append({"role": LLMStrings.USER_ROLE, "content": prompt})
 
     with st.spinner(LLMStrings.WAIT_MESSAGE):
         with st.chat_message(LLMStrings.AI_ROLE):
-            response = output_text(prompt, mongo_server)
-
-            # Lưu phản hồi AI vào session state
+            response = output_text(prompt, mongo_server, session_id=st.session_state.session_id)
             st.session_state.messages.append({"role": LLMStrings.AI_ROLE, "content": response})
-
-            # Hiển thị phản hồi
             simulate_response(response)
-
-
-        # Lưu vào MongoDB với timestamp
-        mongo_server.insert_many([
-            {
-                "role": LLMStrings.USER_ROLE,
-                "content": prompt,
-                "timestamp": datetime.utcnow()  # Thêm timestamp
-            },
-            {
-                "role": LLMStrings.AI_ROLE,
-                "content": response,
-                "timestamp": datetime.utcnow()
-            }
+        
+        mongo_server.insert_messages(st.session_state.session_id, [
+            {"role": LLMStrings.USER_ROLE, "content": prompt, "timestamp": time_stamp()},
+            {"role": LLMStrings.AI_ROLE, "content": response, "timestamp": time_stamp()}
         ])

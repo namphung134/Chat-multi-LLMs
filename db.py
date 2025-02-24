@@ -3,6 +3,8 @@ from pymongo import MongoClient, ASCENDING
 from dotenv import load_dotenv
 from typing import List, Dict
 import os
+from llm_strings import LLMStrings, time_stamp
+
 
 # take environment variables from .env
 load_dotenv()
@@ -41,51 +43,84 @@ class EasyMongo:
         
         collection = dbname[self.COLLECTION]
         return collection
-    
-    
-    def get_recent_messages(self, limit=5):
-        '''
-        Retrieve the most recent chat history.
-        :param limit: Number of recent messages to retrieve.
-        :type limit: int
-        :return: List of recent messages.
-        :rtype: List[Dict]
-        '''
-        collection = self.get_collection()
-    
-        # Lấy n tin nhắn gần nhất, sắp xếp theo thời gian giảm dần
-        messages = collection.find().sort("_id", -1).limit(limit)
-    
-        # Chuyển thành list và đảo ngược lại để giữ thứ tự hội thoại
-        messages = list(messages)[::-1]
-            
-        return messages
-    
-    
-    def insert_many(self, data: Dict):
-        '''
-        Insert multiple data chat to MongoDB.
 
-        :param data: List of Dictionaries.
-        :type data: List[Dict]
-        '''
+
+    # def get_recent_messages(self, session_id: str, limit=10):
+    #     """
+    #     Retrieve the most recent messages for a given session_id.
+    #     """
+    #     collection = self.get_collection()
+    #     messages = collection.find({"session_id": session_id}).sort("_id", 1).limit(limit)
+    #     return list(messages)
+
+    def get_recent_messages(self, session_id: str, limit=10):
+        """
+        Lấy tin nhắn gần nhất từ session_id.
+        """
         collection = self.get_collection()
+        session = collection.find_one({"session_id": session_id}, {"messages": {"$slice": -limit}})
         
-        try: 
-            # Insert the data
-            result = collection.insert_many(data)
-            print(f"Inserted {len(result.inserted_ids)} documents.")
-            print(f"Inserted IDs: {result.inserted_ids}")
+        if not session:
+            print(f"Warning: No messages found for session_id {session_id}")
+            return []
+        
+        return session["messages"]
+
+
+    def insert_messages(self, session_id: str, messages: List[Dict]):
+        """
+        Chèn hoặc cập nhật tin nhắn vào session_id.
+        Nếu session chưa tồn tại, tạo mới với ObjectId().
+        """
+        if not session_id:
+            raise ValueError("session_id không hợp lệ!")
+
+        collection = self.get_collection()
+
+        try:
+            collection.update_one(
+                {"session_id": session_id},  # Truy vấn theo session_id
+                {
+                    "$push": {"messages": {"$each": messages}}, 
+                    "$setOnInsert": {
+                        "session_id": session_id,  # Đảm bảo session_id luôn tồn tại
+                        "created_at": time_stamp()
+                    }
+                },
+                upsert=True
+            )
+            print(f"Updated session {session_id} with {len(messages)} new messages")
+            print(collection)
         except Exception as e:
-            print(f"An error occured: {e}")
-        
-            
+            print(f"An error occurred: {e}")
+
+
+    def get_chat_sessions(self):
+        """
+        Retrieve all unique chat session IDs.
+        """
+        collection = self.get_collection()
+        sessions = collection.distinct("session_id")  # Lấy tất cả session_id duy nhất
+        return sessions
+
     def init_ttl_index(self):
         """
-        Tạo TTL Index cho collection để tự động xóa dữ liệu sau 24h.
+        Tạo TTL Index chỉ áp dụng cho token usage, không ảnh hưởng đến lịch sử hội thoại.
         """
         collection = self.get_collection()
-        collection.create_index([("timestamp", ASCENDING)], expireAfterSeconds=1000)
+        
+        # Xóa TTL Index cũ nếu có
+        existing_indexes = collection.index_information()
+        for index in existing_indexes:
+            if "timestamp" in existing_indexes[index]["key"]:
+                collection.drop_index(index)
+
+        # Chỉ đặt TTL Index cho các tài liệu có "type": "token_usage"
+        collection.create_index(
+            [("timestamp", ASCENDING)], 
+            expireAfterSeconds=150,  # 24 giờ
+            partialFilterExpression={"type": "token_usage"}  # Chỉ áp dụng TTL cho token usage
+        )
 
 
     def get_token_usage(self, model_name):
@@ -104,7 +139,11 @@ class EasyMongo:
         collection = self.get_collection()
         collection.update_one(
             {"type": "token_usage", "model": model_name},
-            {"$set": {"used_tokens": used_tokens, "timestamp": datetime.utcnow()}},
+            {"$set": {
+                "used_tokens": used_tokens, 
+                "timestamp": time_stamp()
+                }
+            },
             upsert=True
         )
        

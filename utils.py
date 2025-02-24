@@ -1,12 +1,11 @@
 import streamlit as st
 import time
-from llm_strings import LLMStrings
+from llm_strings import time_stamp, LLMStrings
 import google.generativeai as genai
 from openai import OpenAI
 from typing import Dict
 import os
 from db import EasyMongo
-
 
 # Load API Keys
 GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
@@ -50,7 +49,7 @@ def create_message(role: str, content: str) -> Dict:
     return {LLMStrings.ROLE_ID: role, LLMStrings.CONTENT: content}
 
 
-def output_text(text: str, mongo: EasyMongo) -> str:
+def output_text(text: str, mongo: EasyMongo, session_id: str) -> str:
     """
     Generates output from the LLM model.
 
@@ -65,7 +64,7 @@ def output_text(text: str, mongo: EasyMongo) -> str:
     :rtype: str
     """
     # Lấy 5 tin nhắn gần nhất từ MongoDB
-    recent_messages = mongo.get_recent_messages(limit=5)
+    recent_messages = mongo.get_recent_messages(session_id=session_id, limit=5)
     print(recent_messages)
     
     # Xây dựng lịch sử hội thoại
@@ -133,3 +132,4 @@ def simulate_response(text: str):
 
     # Write full response
     message_placeholder.markdown(full_response)
+

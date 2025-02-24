@@ -1,3 +1,5 @@
+from datetime import datetime, timezone, timedelta
+
 """
 Module: llm_strings.py
 Description: A class that contains various strings for use for the LLM Chatbot.
@@ -38,3 +40,8 @@ class LLMStrings:
         :rtype: str
         """
         return "1.0.0"
+    
+def time_stamp():
+    timestamp = datetime.utcnow().timestamp()
+    dt_vietnam = datetime.utcfromtimestamp(timestamp) + timedelta(hours=7)
+    return dt_vietnam.strftime("%Y-%m-%d %H:%M:%S")
