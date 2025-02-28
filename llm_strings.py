@@ -41,7 +41,8 @@ class LLMStrings:
         """
         return "1.0.0"
     
+    
 def time_stamp():
-    timestamp = datetime.utcnow().timestamp()
-    dt_vietnam = datetime.utcfromtimestamp(timestamp) + timedelta(hours=7)
+    vietnam_tz = timezone(timedelta(hours=7))  # Tạo timezone UTC+7
+    dt_vietnam = datetime.now(vietnam_tz)  # Lấy giờ hiện tại với timezone Việt Nam
     return dt_vietnam.strftime("%Y-%m-%d %H:%M:%S")

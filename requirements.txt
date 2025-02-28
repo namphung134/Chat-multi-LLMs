@@ -5,3 +5,11 @@ langchain
 pandas
 openai
 python-dotenv
+requests 
+beautifulsoup4 
+sentence-transformers 
+faiss-cpu
+langchain-community
+PyPDF2
+docx
+mistralai

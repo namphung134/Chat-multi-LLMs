@@ -15,6 +15,7 @@ class EasyMongo:
     A simple wrapper for MongoDB Clients.
     '''
     
+
     def __init__(self):
         '''
         Initialize the MongoDB client.
@@ -22,7 +23,7 @@ class EasyMongo:
         self.URI = os.getenv("MONGO_URI")
         self.DB = "MONGO_DB"
         self.COLLECTION = "MONGO_COLLECTION"
-        
+        self.VECTORSTORE_COLLECTION = "VECTORSTORE_COLLECTION"  # Collection mới cho vectorstore
         
     def get_database(self):
         '''
@@ -45,17 +46,9 @@ class EasyMongo:
         return collection
 
 
-    # def get_recent_messages(self, session_id: str, limit=10):
-    #     """
-    #     Retrieve the most recent messages for a given session_id.
-    #     """
-    #     collection = self.get_collection()
-    #     messages = collection.find({"session_id": session_id}).sort("_id", 1).limit(limit)
-    #     return list(messages)
-
     def get_recent_messages(self, session_id: str, limit=10):
         """
-        Lấy tin nhắn gần nhất từ session_id.
+        Retrieve the most recent messages for a given session_id.
         """
         collection = self.get_collection()
         session = collection.find_one({"session_id": session_id}, {"messages": {"$slice": -limit}})
@@ -103,25 +96,6 @@ class EasyMongo:
         sessions = collection.distinct("session_id")  # Lấy tất cả session_id duy nhất
         return sessions
 
-    def init_ttl_index(self):
-        """
-        Tạo TTL Index chỉ áp dụng cho token usage, không ảnh hưởng đến lịch sử hội thoại.
-        """
-        collection = self.get_collection()
-        
-        # Xóa TTL Index cũ nếu có
-        existing_indexes = collection.index_information()
-        for index in existing_indexes:
-            if "timestamp" in existing_indexes[index]["key"]:
-                collection.drop_index(index)
-
-        # Chỉ đặt TTL Index cho các tài liệu có "type": "token_usage"
-        collection.create_index(
-            [("timestamp", ASCENDING)], 
-            expireAfterSeconds=150,  # 24 giờ
-            partialFilterExpression={"type": "token_usage"}  # Chỉ áp dụng TTL cho token usage
-        )
-
 
     def get_token_usage(self, model_name):
         """
@@ -141,13 +115,47 @@ class EasyMongo:
             {"type": "token_usage", "model": model_name},
             {"$set": {
                 "used_tokens": used_tokens, 
-                "timestamp": time_stamp()
+                "timestamp": datetime.utcnow() #không dùng time_stamp() vì nó sẽ không xoá đc token_usage
                 }
             },
             upsert=True
         )
        
-            
+
+    #----------------------URL---------------------------
+
+    def init_ttl_index(self):
+        """Tạo TTL Index cho token usage trong MONGO_COLLECTION."""
+        collection = self.get_collection()
+        existing_indexes = collection.index_information()
+        for index in existing_indexes:
+            if "timestamp" in existing_indexes[index]["key"]:
+                collection.drop_index(index)
+        collection.create_index(
+            [("timestamp", ASCENDING)],
+            expireAfterSeconds=300,  # 1 ngày
+            partialFilterExpression={"type": "token_usage"}
+        )
+
+
+    def init_vectorstore_ttl_index(self):
+        collection = self.get_database()[self.VECTORSTORE_COLLECTION]
+        index_name = "created_at_1"
+        
+        existing_indexes = collection.index_information()
+        if index_name in existing_indexes:
+            if existing_indexes[index_name].get("expireAfterSeconds") != 300:  # 300 giây như code hiện tại của bạn
+                collection.drop_index(index_name)
+                print(f"Dropped existing index {index_name} in {self.VECTORSTORE_COLLECTION}")
+        
+        collection.create_index(
+            [("created_at", ASCENDING)],
+            expireAfterSeconds=300,
+            name=index_name
+        )
+        print(f"Created TTL index for {self.VECTORSTORE_COLLECTION} on created_at")
+
+
     def test_data(self):
         '''
         Test data for MongoDB.
