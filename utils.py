@@ -14,17 +14,18 @@ import numpy as np
 from datetime import datetime
 import PyPDF2
 from docx import Document
-from mistralai import Mistral  # Import client mới từ mistralai
+from mistralai import Mistral
+
 # Load API Keys
 GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
-MISTRAL_API_KEY = os.getenv("MISTRAL_API_KEY")  # Thêm API key cho Mistral
+MISTRAL_API_KEY = os.getenv("MISTRAL_API_KEY")
 
 # Cấu hình các model
 genai.configure(api_key=GOOGLE_API_KEY)
 gemini_model = genai.GenerativeModel("gemini-2.0-flash")
 gpt_client = OpenAI(api_key=OPENAI_API_KEY)
-mistral_client = Mistral(api_key=MISTRAL_API_KEY)  # Khởi tạo Mistral client mới
+mistral_client = Mistral(api_key=MISTRAL_API_KEY)
 
 # Khởi tạo OpenAI client cho embedding
 openai_client = OpenAI(api_key=OPENAI_API_KEY)
@@ -32,8 +33,6 @@ openai_client = OpenAI(api_key=OPENAI_API_KEY)
 # Mức token tối đa mỗi ngày
 MAX_TOKENS_PER_MODEL = 20000
 
-
-# Function: Check tokens and Get model available
 # Function: Check tokens and Get model available
 def get_model_and_check_tokens(mongo: EasyMongo, preferred_model=None):
     gemini_usage = mongo.get_token_usage("gemini-2.0-flash")
@@ -50,7 +49,7 @@ def get_model_and_check_tokens(mongo: EasyMongo, preferred_model=None):
         elif gpt_available:
             return "gpt-3.5-turbo", gpt_client
         elif pixtral_available:
-            return "pixtral-12b-2409", mistral_client  # Trả về mistral_client, không dùng pixtral_model
+            return "pixtral-12b-2409", mistral_client
         return None, None
 
     if preferred_model == "gemini-2.0-flash" and gemini_available:
@@ -58,40 +57,22 @@ def get_model_and_check_tokens(mongo: EasyMongo, preferred_model=None):
     elif preferred_model == "gpt-3.5-turbo" and gpt_available:
         return "gpt-3.5-turbo", gpt_client
     elif preferred_model == "pixtral-12b-2409" and pixtral_available:
-        return "pixtral-12b-2409", mistral_client  # Trả về mistral_client, không dùng pixtral_model
+        return "pixtral-12b-2409", mistral_client
     else:
         if gemini_available:
             return "gemini-2.0-flash", gemini_model
         elif gpt_available:
             return "gpt-3.5-turbo", gpt_client
         elif pixtral_available:
-            return "pixtral-12b-2409", mistral_client  # Trả về mistral_client, không dùng pixtral_model
+            return "pixtral-12b-2409", mistral_client
         return None, None
-
 
 # Function: Create message with ROLE.ID and CONTENT
 def create_message(role: str, content: str) -> Dict:
-    """
-    :param role: Role of the message sender, i.e. ai, user, assistant.
-    :type role: str
-    
-    :param content: Content of the message.
-    :type content: str
-
-    :return: Message data.
-    :rtype: Dict
-    """
     return {LLMStrings.ROLE_ID: role, LLMStrings.CONTENT: content}
-
 
 # FUNCTION: SIMULATE RESPONSE
 def simulate_response(text: str):
-    """
-    Simulate stream of response with milliseconds delay.
-
-    :param text: LLM response text.
-    :type text: str
-    """
     message_placeholder = st.empty()
     full_response = ""
     time_delay = 0.05
@@ -99,10 +80,8 @@ def simulate_response(text: str):
     for chunk in text.split():
         full_response += chunk + " "
         time.sleep(time_delay)
-        # Add a blinking cursor to simulate typing
         message_placeholder.markdown(full_response + "▌")
 
-    # Write full response
     message_placeholder.markdown(full_response)
 
 
@@ -307,7 +286,7 @@ def retrieve_relevant_chunks(session_id: str, identifier: str, query: str, mongo
 
 
 # Function: OUTPUT TEXT
-def output_text(text: str, mongo: EasyMongo, session_id: str, uploaded_file=None) -> str:
+def output_text(text: str, mongo: EasyMongo, session_id: str, uploaded_file=None, model_name=None) -> str:
     recent_messages = mongo.get_recent_messages(session_id=session_id, limit=5)
     conversation_history = "\n".join(
         [f"{msg.get('role', 'unknown')}: {msg.get('content', '')}" for msg in recent_messages]
@@ -381,24 +360,24 @@ def output_text(text: str, mongo: EasyMongo, session_id: str, uploaded_file=None
         Assistant:
         """
 
-    preferred_model = st.session_state.get("selected_model", "gemini-2.0-flash")
-    model_name, model = get_model_and_check_tokens(mongo, preferred_model=preferred_model)
+    # Sử dụng model_name nếu được truyền vào, nếu không thì lấy từ session_state
+    preferred_model = model_name if model_name else st.session_state.get("selected_model", "gemini-2.0-flash")
+    actual_model_name, model = get_model_and_check_tokens(mongo, preferred_model=preferred_model)
 
     if model is None:
         return "Bạn đã dùng hết token hôm nay. Vui lòng quay lại sau 24h!"
 
-    if model_name == "gemini-2.0-flash":
+    if actual_model_name == "gemini-2.0-flash":
         response = model.generate_content(full_prompt)
         token_used = response._result.usage_metadata.total_token_count
         output_t = response.text
-    elif model_name == "gpt-3.5-turbo":
+    elif actual_model_name == "gpt-3.5-turbo":
         response = model.chat.completions.create(model="gpt-3.5-turbo", messages=[{"role": "user", "content": full_prompt}])
         token_used = response.usage.total_tokens
         output_t = response.choices[0].message.content
-    elif model_name == "pixtral-12b-2409":
-        # Sửa nhánh Pixtral để gọi chat() trực tiếp trên mistral_client
-        response = mistral_client.chat.complete(            
-            model=model_name,
+    elif actual_model_name == "pixtral-12b-2409":
+        response = mistral_client.chat.complete(
+            model=actual_model_name,
             messages=[{"role": "user", "content": full_prompt}]
         )
         token_used = response.usage.total_tokens if hasattr(response, "usage") and hasattr(response.usage, "total_tokens") else 0
@@ -406,8 +385,8 @@ def output_text(text: str, mongo: EasyMongo, session_id: str, uploaded_file=None
     else:
         return "Model not supported."
 
-    new_usage = mongo.get_token_usage(model_name) + token_used
-    mongo.update_token_usage(model_name, new_usage)
+    new_usage = mongo.get_token_usage(actual_model_name) + token_used
+    mongo.update_token_usage(actual_model_name, new_usage)
 
     gemini_usage = mongo.get_token_usage("gemini-2.0-flash")
     gpt_usage = mongo.get_token_usage("gpt-3.5-turbo")
@@ -416,19 +395,19 @@ def output_text(text: str, mongo: EasyMongo, session_id: str, uploaded_file=None
     gpt_disabled = gpt_usage >= MAX_TOKENS_PER_MODEL
     pixtral_disabled = pixtral_usage >= MAX_TOKENS_PER_MODEL
 
-    if model_name == "gemini-2.0-flash" and gemini_disabled:
+    if actual_model_name == "gemini-2.0-flash" and gemini_disabled:
         if not gpt_disabled:
             st.session_state.selected_model = "gpt-3.5-turbo"
         elif not pixtral_disabled:
             st.session_state.selected_model = "pixtral-12b-2409"
         st.rerun()
-    elif model_name == "gpt-3.5-turbo" and gpt_disabled:
+    elif actual_model_name == "gpt-3.5-turbo" and gpt_disabled:
         if not gemini_disabled:
             st.session_state.selected_model = "gemini-2.0-flash"
         elif not pixtral_disabled:
             st.session_state.selected_model = "pixtral-12b-2409"
         st.rerun()
-    elif model_name == "pixtral-12b-2409" and pixtral_disabled:
+    elif actual_model_name == "pixtral-12b-2409" and pixtral_disabled:
         if not gemini_disabled:
             st.session_state.selected_model = "gemini-2.0-flash"
         elif not gpt_disabled:
@@ -437,4 +416,14 @@ def output_text(text: str, mongo: EasyMongo, session_id: str, uploaded_file=None
 
     return output_t
 
-# ... (giữ nguyên các hàm khác)
+# Function: OUTPUT TEXT ALL MODELS
+def output_text_all_models(prompt: str, mongo: EasyMongo, session_id: str, uploaded_file=None) -> Dict:
+    """Gọi output_text cho tất cả model và trả về kết quả."""
+    all_models = ["gemini-2.0-flash", "gpt-3.5-turbo", "pixtral-12b-2409"]
+    responses = {}
+    
+    for model_name in all_models:
+        response = output_text(prompt, mongo, session_id, uploaded_file, model_name=model_name)
+        responses[model_name] = response
+    
+    return responses

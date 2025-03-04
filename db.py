@@ -25,6 +25,7 @@ class EasyMongo:
         self.COLLECTION = "MONGO_COLLECTION"
         self.VECTORSTORE_COLLECTION = "VECTORSTORE_COLLECTION"  # Collection mới cho vectorstore
         
+        
     def get_database(self):
         '''
         Create a connection to the MongoDB Atlas url and return NoSQL Database.
@@ -176,5 +177,3 @@ class EasyMongo:
                                                        "language processing, and speech recognition."}
         
         self.insert_many([user_content, ai_content, user_content2, ai_content2])
-
-
