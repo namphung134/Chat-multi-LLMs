@@ -147,6 +147,7 @@ if chat_sessions:
 st.sidebar.title("Upload File")
 uploaded_file = st.sidebar.file_uploader("Upload a .txt, .pdf, or .docx file", type=["txt", "pdf", "docx"])
 
+
 #----------------------------------Phần CHATBOT------------------------------------#
 if not st.session_state.messages:
     with st.chat_message(LLMStrings.AI_ROLE):
