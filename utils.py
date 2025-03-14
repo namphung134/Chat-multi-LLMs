@@ -31,7 +31,7 @@ mistral_client = Mistral(api_key=MISTRAL_API_KEY)
 openai_client = OpenAI(api_key=OPENAI_API_KEY)
 
 # Mức token tối đa mỗi ngày
-MAX_TOKENS_PER_MODEL = 20000
+MAX_TOKENS_PER_MODEL = 1000
 
 # Function: Check tokens and Get model available
 def get_model_and_check_tokens(mongo: EasyMongo, preferred_model=None):
